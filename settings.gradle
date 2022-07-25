@@ -9,4 +9,4 @@
  */
 
 rootProject.name = 'chem-safety-asst-backend'
-include('lib')
+include('app')
