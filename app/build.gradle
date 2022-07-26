@@ -20,6 +20,7 @@ repositories {
 dependencies {
     // This dependency is used by the application.
     implementation 'com.google.guava:guava:31.0.1-jre'
+    implementation "com.sparkjava:spark-core:2.9.4"
 }
 
 testing {
@@ -34,5 +35,5 @@ testing {
 
 application {
     // Define the main class for the application.
-    mainClass = 'chem.safety.asst.backend.App'
+    mainClass = 'ChemSafetyAsst.App'
 }
