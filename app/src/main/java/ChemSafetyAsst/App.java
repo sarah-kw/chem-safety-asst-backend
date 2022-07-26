@@ -5,6 +5,9 @@
 package ChemSafetyAsst;
 import static spark.Spark.*;
 import Chemical.Chemical;
+import java.io.*;
+import java.net.URI;
+import java.net.http.*;
 
 public class App {
     public String getGreeting() {
@@ -13,6 +16,26 @@ public class App {
 
     public static void main(String[] args) {
         System.out.println(new App().getGreeting());
+        
+        HttpClient client = HttpClient.newBuilder().build();
+        
+        get("/testrequest", (req, res) -> {
+            HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create("https://pubchem.ncbi.nlm.nih.gov/rest/pug/substance/sid/53789435/synonyms/json"))
+            .build();
+            HttpResponse response;
+            try {
+                response = client.send(
+                    request, HttpResponse.BodyHandlers.ofString()
+                    );
+            } catch (IOException e) {
+                // gotBack = "?";
+                System.out.println("IO exception occurred");
+                return "error";
+            }
+            return response.body();
+        });
+
         get("/hello", (req, res) -> "Hello World");
         get("/stop", (req, res) -> {
             stop();

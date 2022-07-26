@@ -1,5 +1,6 @@
 // import java.net.http;
 package Chemical;
+import java.net.http.HttpClient;
 
 public class Chemical {
     String identifier;
