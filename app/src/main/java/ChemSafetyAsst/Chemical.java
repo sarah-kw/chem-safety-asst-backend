@@ -1,4 +1,5 @@
-import java.net.http
+// import java.net.http;
+package Chemical;
 
 public class Chemical {
     String identifier;
@@ -9,8 +10,9 @@ public class Chemical {
     public Chemical (String input_identifier) {
         identifier = input_identifier;
     }
-    public void printIdentifier(){
+    public String printIdentifier(){
         System.out.println("the identifier is");
         System.out.println(identifier);
+        return "The identifier is " + identifier;
     }
 }
