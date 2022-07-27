@@ -8,6 +8,8 @@ import Chemical.Chemical;
 import java.io.*;
 import java.net.URI;
 import java.net.http.*;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
 
 public class App {
     public String getGreeting() {
@@ -18,6 +20,33 @@ public class App {
         System.out.println(new App().getGreeting());
         
         HttpClient client = HttpClient.newBuilder().build();
+        ObjectMapper objectMapper = new ObjectMapper();
+
+        get("/chemicals", (req, res) -> {
+            ArrayList<String> test = new ArrayList<String>();
+            for(String param : req.queryParams()){
+                System.out.println(param);
+                for (String value : req.queryParamsValues(param)){
+                    test.add((param + ": " + value));
+                    HttpRequest cidRequest = HttpRequest.newBuilder()
+                    .uri(
+                        URI.create("https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/"+value+"/cids/json")
+                        ).build();
+                    HttpResponse cidResponse;
+                    try {
+                        cidResponse = client.send(
+                            cidRequest, HttpResponse.BodyHandlers.ofString()
+                            );
+                    } catch (IOException e) {
+                        System.out.println("IO exception occurred");
+                        throw new IOException("error in cidRequest");
+                        // return "error";
+                    }
+                    System.out.println(cidResponse.body());
+                };
+            };
+            return test;
+        });
         
         get("/testrequest", (req, res) -> {
             HttpRequest request = HttpRequest.newBuilder()
