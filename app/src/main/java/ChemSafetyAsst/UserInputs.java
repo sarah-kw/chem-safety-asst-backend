@@ -1,11 +1,11 @@
-package UserInputs;
+package ChemSafetyAsst;
 import java.util.HashMap;
 
 
 
 public class UserInputs {
-    private HashMap inputs;
-    public UserInputs(String inputs){
+    // private HashMap inputs;
+    // public UserInputs(String inputs){
 
-    }
+    // }
 }

@@ -4,18 +4,44 @@
 
 package ChemSafetyAsst;
 import static spark.Spark.*;
-import Chemical.Chemical;
+// import ChemSafetyAsst.Chemical;
 import java.io.*;
 import java.net.URI;
 import java.net.http.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
 
 public class App {
+    private static String pugViewUrl = "https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/";
+    // <cid>/JSON?heading=GHS%20Classification
+    private static String pugRestUrl = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/";
+
     public String getGreeting() {
         return "Hello World! Test";
     }
+    
+    private static String identify(String id){
+        Chemical c = new Chemical(id);
+            return c.printIdentifier();
+    }
 
+    private static HttpRequest hazardsFromCIDrequest(String cid) {
+        HttpRequest getPUGViewData = HttpRequest.newBuilder()
+            .uri(
+                URI.create(pugViewUrl+cid+"/JSON?heading=GHS%20Classification")
+            ).build();
+        return getPUGViewData;
+    }
+
+    private static HttpRequest cidFromSMILESRequest(String smiles){
+        HttpRequest getPUGRestCID = HttpRequest.newBuilder()
+        .uri(
+            URI.create(pugRestUrl+"smiles/"+smiles+"/cids/json")
+        ).build();
+        return getPUGRestCID;
+    }
+    
     public static void main(String[] args) {
         System.out.println(new App().getGreeting());
         
@@ -28,11 +54,13 @@ public class App {
                 System.out.println(param);
                 for (String value : req.queryParamsValues(param)){
                     test.add((param + ": " + value));
-                    HttpRequest cidRequest = HttpRequest.newBuilder()
-                    .uri(
-                        URI.create("https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/"+value+"/cids/json")
-                        ).build();
-                    HttpResponse cidResponse;
+                    HttpRequest cidRequest = cidFromSMILESRequest(value);
+                    // HttpRequest cidRequest = HttpRequest.newBuilder()
+                    // .uri(
+                    //     URI.create("https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/"+value+"/cids/json")
+                    //     ).build();
+                    System.out.println(cidRequest.uri());
+                    HttpResponse<String> cidResponse;
                     try {
                         cidResponse = client.send(
                             cidRequest, HttpResponse.BodyHandlers.ofString()
@@ -42,8 +70,56 @@ public class App {
                         throw new IOException("error in cidRequest");
                         // return "error";
                     }
-                    System.out.println(cidResponse.body());
+                    // System.out.println(cidResponse.body());
+                    JsonNode rootNode = objectMapper.readTree(cidResponse.body());
+                    String cid = rootNode.path("IdentifierList")
+                        .path("CID")
+                        .get(0)
+                        .toString();
+                    System.out.println("I cant believe the cid is "+cid);
+                    HttpRequest hazardRequest = hazardsFromCIDrequest(cid);
+                    HttpResponse<String> hazardResponse;
+                    try {
+                        hazardResponse = client.send(
+                            hazardRequest, HttpResponse.BodyHandlers.ofString()
+                            );
+                    } catch (IOException e) {
+                        System.out.println("IO exception occurred");
+                        throw new IOException("error in hazardRequest");
+                        // return "error";
+                    }
+                    JsonNode hazardRoot = objectMapper.readTree(hazardResponse.body());
+                    JsonNode hazardCodes = hazardRoot
+                        .path("Record")
+                        .path("Section")
+                        .get(0)
+                        .path("Section")
+                        .get(0)
+                        .path("Section")
+                        .get(0)
+                        .path("Information")
+                        .get(2)
+                        .path("Value")
+                        .path("StringWithMarkup");
+                    JsonNode precautionCodes = hazardRoot
+                        .path("Record")
+                        .path("Section")
+                        .get(0)
+                        .path("Section")
+                        .get(0)
+                        .path("Section")
+                        .get(0)
+                        .path("Information")
+                        .get(3)
+                        .path("Value")
+                        .path("StringWithMarkup")
+                        .get(0);
+                    System.out.println("made here");
+                    System.out.println(hazardCodes);
+                    System.out.println(precautionCodes);
                 };
+
+
             };
             return test;
         });
@@ -52,7 +128,7 @@ public class App {
             HttpRequest request = HttpRequest.newBuilder()
             .uri(URI.create("https://pubchem.ncbi.nlm.nih.gov/rest/pug/substance/sid/53789435/synonyms/json"))
             .build();
-            HttpResponse response;
+            HttpResponse<String> response;
             try {
                 response = client.send(
                     request, HttpResponse.BodyHandlers.ofString()
@@ -70,9 +146,12 @@ public class App {
             stop();
             return "stopping";
         });
+        // get("/identifier/:id", (req, res)-> {
+        //     Chemical c = new Chemical(req.params(":id"));
+        //     return c.printIdentifier();
+        // });
         get("/identifier/:id", (req, res)-> {
-            Chemical c = new Chemical(req.params(":id"));
-            return c.printIdentifier();
+            return identify(req.params(":id"));
         });
     }
 }
