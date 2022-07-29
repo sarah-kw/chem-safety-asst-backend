@@ -7,8 +7,15 @@ import java.net.URLEncoder;
 import java.net.URLDecoder;
 
 public class Chemical {
-    private String identifier;
-    private ArrayList<String> hazards;
+    // the name given by the user (smiles or name)
+    private String name;
+    // cid obtained from PUGrest
+    private String cid;
+    // hazard codes+descriptors from PUGView
+    private ArrayList<String[]> hazards;
+    // precaution codes from PUGView
+    private String[] precautions;
+    // whether or not successfully got hazards from PUGView
     private Boolean gotHazards = false;
     public static void main(String[] args){
         //for testing
@@ -16,24 +23,50 @@ public class Chemical {
         testChemical.printIdentifier();
     }
     public Chemical (String input_identifier) {
-        this.identifier = input_identifier;
+        this.name = input_identifier;
     }
 
+    public String getName() {
+        return this.name;
+    }
+
+    public void setCID (String cid){
+        this.cid = cid;
+    }
+    public void setHazards (ArrayList<String[]> hazards){
+        this.hazards = hazards;
+    }
+
+    public ArrayList<String[]> getHazards () {
+        return this.hazards;
+    }
+
+    public void setPrecautions (String[] precautions){
+        this.precautions = precautions;
+    }
+
+    public String[] getPrecautions() {
+        return this.precautions;
+    }
+    
+    public void setGotHazards(){
+        this.gotHazards = true;
+    }
+    public Boolean getGotHazards() {
+        return this.gotHazards;
+    }
 
 
 
     public String printIdentifier(){
-        System.out.println("the identifier is");
-        System.out.println(identifier);
-        return "The identifier is " + this.identifier;
+        System.out.println("the identifier is "+cid);
+        return "The identifier is " + this.cid;
     }
     public String urlify() throws UnsupportedEncodingException{
-        return URLEncoder.encode(this.identifier, "UTF-8");
+        return URLEncoder.encode(this.name, "UTF-8");
     }
     public String deUrlify() throws UnsupportedEncodingException{
-        return URLDecoder.decode(this.identifier, "UTF-8");
+        return URLDecoder.decode(this.cid, "UTF-8");
     }
-    // public HashMap getSafetyData(){
-    //     return
-    // }
+
 }

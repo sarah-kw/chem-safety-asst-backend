@@ -11,6 +11,7 @@ import java.net.http.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.ArrayList;
+import java.util.Iterator;
 
 public class App {
     private static String pugViewUrl = "https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/";
@@ -20,10 +21,33 @@ public class App {
     public String getGreeting() {
         return "Hello World! Test";
     }
-    
-    private static String identify(String id){
-        Chemical c = new Chemical(id);
-            return c.printIdentifier();
+
+// Enables CORS on requests. This method is an initialization method and should be called once.
+// From SparkJava tutorial https://sparkjava.com/tutorials/cors
+    private static void enableCORS(final String origin, final String methods, final String headers) {
+
+        options("/*", (request, response) -> {
+
+            String accessControlRequestHeaders = request.headers("Access-Control-Request-Headers");
+            if (accessControlRequestHeaders != null) {
+                response.header("Access-Control-Allow-Headers", accessControlRequestHeaders);
+            }
+
+            String accessControlRequestMethod = request.headers("Access-Control-Request-Method");
+            if (accessControlRequestMethod != null) {
+                response.header("Access-Control-Allow-Methods", accessControlRequestMethod);
+            }
+
+            return "OK";
+        });
+
+        before((request, response) -> {
+            response.header("Access-Control-Allow-Origin", origin);
+            response.header("Access-Control-Request-Method", methods);
+            response.header("Access-Control-Allow-Headers", headers);
+            // Note: this may or may not be necessary in your particular application
+            // response.type("application/json");
+        });
     }
 
     private static HttpRequest hazardsFromCIDrequest(String cid) {
@@ -31,7 +55,20 @@ public class App {
             .uri(
                 URI.create(pugViewUrl+cid+"/JSON?heading=GHS%20Classification")
             ).build();
+        System.out.println(getPUGViewData.uri());
         return getPUGViewData;
+    }
+
+    private static ArrayList<String[]> createHazardList(JsonNode hazardData) {
+        ArrayList<String[]> hazardReturn = new ArrayList<String[]>();
+        Iterator<JsonNode> hazards = hazardData.elements();
+        while (hazards.hasNext()){
+            JsonNode oneHazard = hazards.next();
+            System.out.println(oneHazard.path("String").textValue().split(":")[0]);
+            String hazInfo[] = oneHazard.path("String").textValue().split(":");
+            hazardReturn.add(hazInfo);
+        }
+        return hazardReturn;
     }
 
     private static HttpRequest cidFromSMILESRequest(String smiles){
@@ -42,23 +79,23 @@ public class App {
         return getPUGRestCID;
     }
     
+    //main app starts here
     public static void main(String[] args) {
+        // Does this make the app??? check later
         System.out.println(new App().getGreeting());
         
+        // Setup; need one of each of these 
+        enableCORS("http://localhost:3000", "GET", "*");
         HttpClient client = HttpClient.newBuilder().build();
         ObjectMapper objectMapper = new ObjectMapper();
 
         get("/chemicals", (req, res) -> {
-            ArrayList<String> test = new ArrayList<String>();
+            ArrayList<Chemical> chemicals = new ArrayList<Chemical>();
             for(String param : req.queryParams()){
                 System.out.println(param);
                 for (String value : req.queryParamsValues(param)){
-                    test.add((param + ": " + value));
-                    HttpRequest cidRequest = cidFromSMILESRequest(value);
-                    // HttpRequest cidRequest = HttpRequest.newBuilder()
-                    // .uri(
-                    //     URI.create("https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/smiles/"+value+"/cids/json")
-                    //     ).build();
+                    Chemical newChemical = new Chemical(value);
+                    HttpRequest cidRequest = cidFromSMILESRequest(newChemical.urlify());
                     System.out.println(cidRequest.uri());
                     HttpResponse<String> cidResponse;
                     try {
@@ -68,60 +105,98 @@ public class App {
                     } catch (IOException e) {
                         System.out.println("IO exception occurred");
                         throw new IOException("error in cidRequest");
-                        // return "error";
                     }
-                    // System.out.println(cidResponse.body());
-                    JsonNode rootNode = objectMapper.readTree(cidResponse.body());
-                    String cid = rootNode.path("IdentifierList")
-                        .path("CID")
-                        .get(0)
-                        .toString();
-                    System.out.println("I cant believe the cid is "+cid);
-                    HttpRequest hazardRequest = hazardsFromCIDrequest(cid);
-                    HttpResponse<String> hazardResponse;
-                    try {
-                        hazardResponse = client.send(
-                            hazardRequest, HttpResponse.BodyHandlers.ofString()
-                            );
-                    } catch (IOException e) {
-                        System.out.println("IO exception occurred");
-                        throw new IOException("error in hazardRequest");
-                        // return "error";
-                    }
-                    JsonNode hazardRoot = objectMapper.readTree(hazardResponse.body());
-                    JsonNode hazardCodes = hazardRoot
-                        .path("Record")
-                        .path("Section")
-                        .get(0)
-                        .path("Section")
-                        .get(0)
-                        .path("Section")
-                        .get(0)
-                        .path("Information")
-                        .get(2)
-                        .path("Value")
-                        .path("StringWithMarkup");
-                    JsonNode precautionCodes = hazardRoot
-                        .path("Record")
-                        .path("Section")
-                        .get(0)
-                        .path("Section")
-                        .get(0)
-                        .path("Section")
-                        .get(0)
-                        .path("Information")
-                        .get(3)
-                        .path("Value")
-                        .path("StringWithMarkup")
-                        .get(0);
-                    System.out.println("made here");
-                    System.out.println(hazardCodes);
-                    System.out.println(precautionCodes);
+
+
+                    if (cidResponse.statusCode() == 200){
+                        JsonNode rootNode = objectMapper.readTree(cidResponse.body());
+                        String cid = rootNode.path("IdentifierList")
+                            .path("CID")
+                            .get(0)
+                            .toString();
+                        
+                        newChemical.setCID(cid);
+
+                        HttpRequest hazardRequest = hazardsFromCIDrequest(cid);
+                        HttpResponse<String> hazardResponse;
+                        try {
+                            hazardResponse = client.send(
+                                hazardRequest, HttpResponse.BodyHandlers.ofString()
+                                );
+                        } catch (IOException e) {
+                            System.out.println("IO exception occurred");
+                            throw new IOException("error in hazardRequest");
+                        }
+
+                        JsonNode hazardRoot = objectMapper.readTree(hazardResponse.body());
+
+                        JsonNode hazardCheckpoint = hazardRoot
+                            .path("Record")
+                            .path("Section")
+                            .get(0)
+                            .path("Section")
+                            .get(0)
+                            .path("Section")
+                            .get(0)
+                            .path("Information");
+                        
+                        System.out.println("the size is "+ hazardCheckpoint.size());
+                        if (hazardCheckpoint.size() > 1){
+                            JsonNode hazardCodes = hazardRoot
+                            .path("Record")
+                            .path("Section")
+                            .get(0)
+                            .path("Section")
+                            .get(0)
+                            .path("Section")
+                            .get(0)
+                            .path("Information")
+                            .get(2)
+                            .path("Value")
+                            .path("StringWithMarkup");
+                            ArrayList<String[]> hazardList = createHazardList(hazardCodes);
+                            // System.out.println(toPrint.get(0)[1]);
+                            System.out.println(hazardList);
+                            newChemical.setHazards(hazardList);
+
+                            JsonNode precautionCodes = hazardRoot
+                            .path("Record")
+                            .path("Section")
+                            .get(0)
+                            .path("Section")
+                            .get(0)
+                            .path("Section")
+                            .get(0)
+                            .path("Information")
+                            .get(3)
+                            .path("Value")
+                            .path("StringWithMarkup")
+                            .get(0);
+
+                            // String[] precInfo = precautionCodes
+                            //     .path("String").textValue().split(", ");
+                            String[] precInfo = precautionCodes
+                                .path("String").textValue().split(", and |, |and ");
+                            System.out.println(precautionCodes);
+                            System.out.println(precInfo);
+                            newChemical.setPrecautions(precInfo);
+                        } else {
+                            ArrayList<String[]> hazardList = new ArrayList<String[]>();
+                            newChemical.setHazards(hazardList);
+                            String[] precautionList = new String[0];
+                            newChemical.setPrecautions(precautionList);
+                        };
+                        newChemical.setGotHazards();
+                        chemicals.add(newChemical);
+
+                    } else {
+                        chemicals.add(newChemical);
+                    };
                 };
-
-
             };
-            return test;
+
+            String chemicalJson = objectMapper.writeValueAsString(chemicals);
+            return chemicalJson;
         });
         
         get("/testrequest", (req, res) -> {
@@ -134,24 +209,20 @@ public class App {
                     request, HttpResponse.BodyHandlers.ofString()
                     );
             } catch (IOException e) {
-                // gotBack = "?";
                 System.out.println("IO exception occurred");
                 return "error";
             }
             return response.body();
         });
 
-        get("/hello", (req, res) -> "Hello World");
+        get("/hello", (req, res) -> 
+        {
+            return "{\"Hello World\"}";
+        });
+
         get("/stop", (req, res) -> {
             stop();
             return "stopping";
-        });
-        // get("/identifier/:id", (req, res)-> {
-        //     Chemical c = new Chemical(req.params(":id"));
-        //     return c.printIdentifier();
-        // });
-        get("/identifier/:id", (req, res)-> {
-            return identify(req.params(":id"));
         });
     }
 }
