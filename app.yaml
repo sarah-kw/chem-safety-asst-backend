@@ -1,0 +1,17 @@
+### For deploying to Google App Engine
+
+runtime: java18 # or another supported version
+
+# instance_class: F2
+
+env_variables:
+  BUCKET_NAME: "example-gcs-bucket"
+
+handlers:
+- url: /stylesheets
+  static_dir: stylesheets
+
+- url: /.*
+  secure: always
+  redirect_http_response_code: 301
+  script: auto

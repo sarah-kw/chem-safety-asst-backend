@@ -79,10 +79,18 @@ public class App {
         return getPUGRestCID;
     }
     
+    private static HttpRequest cidFromNameRequest(String name){
+        HttpRequest getPUGRestCID = HttpRequest.newBuilder()
+        .uri(
+            URI.create(pugRestUrl+"name/"+name+"/cids/json")
+        ).build();
+        return getPUGRestCID;
+    }
+
     //main app starts here
     public static void main(String[] args) {
         // Does this make the app??? check later
-        System.out.println(new App().getGreeting());
+        // System.out.println(new App().getGreeting());
         
         // Setup; need one of each of these 
         enableCORS("http://localhost:3000", "GET", "*");
@@ -95,7 +103,8 @@ public class App {
                 System.out.println(param);
                 for (String value : req.queryParamsValues(param)){
                     Chemical newChemical = new Chemical(value);
-                    HttpRequest cidRequest = cidFromSMILESRequest(newChemical.urlify());
+                    // HttpRequest cidRequest = cidFromSMILESRequest(newChemical.urlify());
+                    HttpRequest cidRequest = cidFromNameRequest(newChemical.urlify());
                     System.out.println(cidRequest.uri());
                     HttpResponse<String> cidResponse;
                     try {
