@@ -29,7 +29,9 @@ public class Chemical {
     public String getName() {
         return this.name;
     }
-
+    public String getCID() {
+        return this.cid;
+    }
     public void setCID (String cid){
         this.cid = cid;
     }

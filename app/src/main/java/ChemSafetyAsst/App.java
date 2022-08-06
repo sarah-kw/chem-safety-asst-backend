@@ -87,6 +87,82 @@ public class App {
         return getPUGRestCID;
     }
 
+    private static void getHazardsByCID(Chemical chemical, HttpClient client, ObjectMapper objectMapper) throws IOException, InterruptedException{
+        HttpRequest hazardRequest = hazardsFromCIDrequest(chemical.getCID());
+        HttpResponse<String> hazardResponse;
+        try {
+            hazardResponse = client.send(
+                hazardRequest, HttpResponse.BodyHandlers.ofString()
+                );
+            } catch (IOException e) {
+                System.out.println("IO exception occurred");
+                throw new IOException("error in hazardRequest");
+            } catch (InterruptedException e){
+                System.out.println("Interrupted exception occurred");
+                throw new InterruptedException("error in hazardRequest");
+            }
+
+        JsonNode hazardRoot = objectMapper.readTree(hazardResponse.body());
+
+        JsonNode hazardCheckpoint = hazardRoot
+            .path("Record")
+            .path("Section")
+            .get(0)
+            .path("Section")
+            .get(0)
+            .path("Section")
+            .get(0)
+            .path("Information");
+                        
+        System.out.println("the size is "+ hazardCheckpoint.size());
+        if (hazardCheckpoint.size() > 1){
+            JsonNode hazardCodes = hazardRoot
+                .path("Record")
+                .path("Section")
+                .get(0)
+                .path("Section")
+                .get(0)
+                .path("Section")
+                .get(0)
+                .path("Information")
+                .get(2)
+                .path("Value")
+                .path("StringWithMarkup");
+            ArrayList<String[]> hazardList = createHazardList(hazardCodes);
+                            // System.out.println(toPrint.get(0)[1]);
+            System.out.println(hazardList);
+            chemical.setHazards(hazardList);
+
+            JsonNode precautionCodes = hazardRoot
+                .path("Record")
+                .path("Section")
+                .get(0)
+                .path("Section")
+                .get(0)
+                .path("Section")
+                .get(0)
+                .path("Information")
+                .get(3)
+                .path("Value")
+                .path("StringWithMarkup")
+                .get(0);
+
+                            // String[] precInfo = precautionCodes
+                            //     .path("String").textValue().split(", ");
+            String[] precInfo = precautionCodes
+                .path("String").textValue().split(", and |, |and ");
+            System.out.println(precautionCodes);
+            System.out.println(precInfo);
+            chemical.setPrecautions(precInfo);
+        } else {
+            ArrayList<String[]> hazardList = new ArrayList<String[]>();
+            chemical.setHazards(hazardList);
+            String[] precautionList = new String[0];
+            chemical.setPrecautions(precautionList);
+        };
+        chemical.setGotHazards();
+    }
+
     //main app starts here
     public static void main(String[] args) {
         // Does this make the app??? check later
@@ -103,6 +179,7 @@ public class App {
                 System.out.println(param);
                 for (String value : req.queryParamsValues(param)){
                     Chemical newChemical = new Chemical(value);
+                    // Try search by name
                     // HttpRequest cidRequest = cidFromSMILESRequest(newChemical.urlify());
                     HttpRequest cidRequest = cidFromNameRequest(newChemical.urlify());
                     System.out.println(cidRequest.uri());
@@ -115,7 +192,20 @@ public class App {
                         System.out.println("IO exception occurred");
                         throw new IOException("error in cidRequest");
                     }
-
+                    // if (cidResponse.statusCode() != 200){
+                    //     // Try search by SMILES
+                    //     HttpRequest cidRequestSMILES = cidFromSMILESRequest(newChemical.urlify());
+                    //     System.out.println(cidRequestSMILES.uri());
+                    //     HttpResponse<String> cidResponseSMILES;
+                    //     try {
+                    //         cidResponseSMILES = client.send(
+                    //             cidRequestSMILES, HttpResponse.BodyHandlers.ofString()
+                    //             );
+                    //     } catch (IOException e) {
+                    //         System.out.println("IO exception occurred");
+                    //         throw new IOException("error in cidRequest");
+                    //     }
+                    // }
 
                     if (cidResponse.statusCode() == 200){
                         JsonNode rootNode = objectMapper.readTree(cidResponse.body());
@@ -125,81 +215,105 @@ public class App {
                             .toString();
                         
                         newChemical.setCID(cid);
+                        getHazardsByCID(newChemical, client, objectMapper);
+                        // HttpRequest hazardRequest = hazardsFromCIDrequest(cid);
+                        // HttpResponse<String> hazardResponse;
+                        // try {
+                        //     hazardResponse = client.send(
+                        //         hazardRequest, HttpResponse.BodyHandlers.ofString()
+                        //         );
+                        // } catch (IOException e) {
+                        //     System.out.println("IO exception occurred");
+                        //     throw new IOException("error in hazardRequest");
+                        // }
 
-                        HttpRequest hazardRequest = hazardsFromCIDrequest(cid);
-                        HttpResponse<String> hazardResponse;
-                        try {
-                            hazardResponse = client.send(
-                                hazardRequest, HttpResponse.BodyHandlers.ofString()
-                                );
-                        } catch (IOException e) {
-                            System.out.println("IO exception occurred");
-                            throw new IOException("error in hazardRequest");
-                        }
+                        // JsonNode hazardRoot = objectMapper.readTree(hazardResponse.body());
 
-                        JsonNode hazardRoot = objectMapper.readTree(hazardResponse.body());
-
-                        JsonNode hazardCheckpoint = hazardRoot
-                            .path("Record")
-                            .path("Section")
-                            .get(0)
-                            .path("Section")
-                            .get(0)
-                            .path("Section")
-                            .get(0)
-                            .path("Information");
+                        // JsonNode hazardCheckpoint = hazardRoot
+                        //     .path("Record")
+                        //     .path("Section")
+                        //     .get(0)
+                        //     .path("Section")
+                        //     .get(0)
+                        //     .path("Section")
+                        //     .get(0)
+                        //     .path("Information");
                         
-                        System.out.println("the size is "+ hazardCheckpoint.size());
-                        if (hazardCheckpoint.size() > 1){
-                            JsonNode hazardCodes = hazardRoot
-                            .path("Record")
-                            .path("Section")
-                            .get(0)
-                            .path("Section")
-                            .get(0)
-                            .path("Section")
-                            .get(0)
-                            .path("Information")
-                            .get(2)
-                            .path("Value")
-                            .path("StringWithMarkup");
-                            ArrayList<String[]> hazardList = createHazardList(hazardCodes);
-                            // System.out.println(toPrint.get(0)[1]);
-                            System.out.println(hazardList);
-                            newChemical.setHazards(hazardList);
+                        // System.out.println("the size is "+ hazardCheckpoint.size());
+                        // if (hazardCheckpoint.size() > 1){
+                        //     JsonNode hazardCodes = hazardRoot
+                        //     .path("Record")
+                        //     .path("Section")
+                        //     .get(0)
+                        //     .path("Section")
+                        //     .get(0)
+                        //     .path("Section")
+                        //     .get(0)
+                        //     .path("Information")
+                        //     .get(2)
+                        //     .path("Value")
+                        //     .path("StringWithMarkup");
+                        //     ArrayList<String[]> hazardList = createHazardList(hazardCodes);
+                        //     // System.out.println(toPrint.get(0)[1]);
+                        //     System.out.println(hazardList);
+                        //     newChemical.setHazards(hazardList);
 
-                            JsonNode precautionCodes = hazardRoot
-                            .path("Record")
-                            .path("Section")
-                            .get(0)
-                            .path("Section")
-                            .get(0)
-                            .path("Section")
-                            .get(0)
-                            .path("Information")
-                            .get(3)
-                            .path("Value")
-                            .path("StringWithMarkup")
-                            .get(0);
+                        //     JsonNode precautionCodes = hazardRoot
+                        //     .path("Record")
+                        //     .path("Section")
+                        //     .get(0)
+                        //     .path("Section")
+                        //     .get(0)
+                        //     .path("Section")
+                        //     .get(0)
+                        //     .path("Information")
+                        //     .get(3)
+                        //     .path("Value")
+                        //     .path("StringWithMarkup")
+                        //     .get(0);
 
-                            // String[] precInfo = precautionCodes
-                            //     .path("String").textValue().split(", ");
-                            String[] precInfo = precautionCodes
-                                .path("String").textValue().split(", and |, |and ");
-                            System.out.println(precautionCodes);
-                            System.out.println(precInfo);
-                            newChemical.setPrecautions(precInfo);
-                        } else {
-                            ArrayList<String[]> hazardList = new ArrayList<String[]>();
-                            newChemical.setHazards(hazardList);
-                            String[] precautionList = new String[0];
-                            newChemical.setPrecautions(precautionList);
-                        };
-                        newChemical.setGotHazards();
+                        //     // String[] precInfo = precautionCodes
+                        //     //     .path("String").textValue().split(", ");
+                        //     String[] precInfo = precautionCodes
+                        //         .path("String").textValue().split(", and |, |and ");
+                        //     System.out.println(precautionCodes);
+                        //     System.out.println(precInfo);
+                        //     newChemical.setPrecautions(precInfo);
+                        // } else {
+                        //     ArrayList<String[]> hazardList = new ArrayList<String[]>();
+                        //     newChemical.setHazards(hazardList);
+                        //     String[] precautionList = new String[0];
+                        //     newChemical.setPrecautions(precautionList);
+                        // };
+                        // newChemical.setGotHazards();
                         chemicals.add(newChemical);
 
                     } else {
-                        chemicals.add(newChemical);
+                        // Try search by SMILES
+                        HttpRequest cidRequestSMILES = cidFromSMILESRequest(newChemical.urlify());
+                        System.out.println(cidRequestSMILES.uri());
+                        HttpResponse<String> cidResponseSMILES;
+                        try {
+                            cidResponseSMILES = client.send(
+                                cidRequestSMILES, HttpResponse.BodyHandlers.ofString()
+                                );
+                        } catch (IOException e) {
+                            System.out.println("IO exception occurred");
+                            throw new IOException("error in cidRequest");
+                        };
+
+                        if (cidResponseSMILES.statusCode() == 200){
+                            JsonNode rootNode = objectMapper.readTree(cidResponseSMILES.body());
+                            String cid = rootNode.path("IdentifierList")
+                                .path("CID")
+                                .get(0)
+                                .toString();
+                            
+                            newChemical.setCID(cid);
+                            getHazardsByCID(newChemical, client, objectMapper);
+                            chemicals.add(newChemical);
+                        } else{
+                        chemicals.add(newChemical);}
                     };
                 };
             };
