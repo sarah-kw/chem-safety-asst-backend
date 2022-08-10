@@ -31,3 +31,5 @@ gradle-app.setting
 .vscode
 
 .DS_Store
+
+.idea

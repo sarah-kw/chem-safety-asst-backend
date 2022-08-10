@@ -11,6 +11,7 @@ plugins {
     // Apply the application plugin to add support for building a CLI application in Java.
     id 'application'
     id 'com.google.cloud.tools.jib' version '3.2.1'
+    id 'com.microsoft.azure.azurewebapp' version '1.2.0'
 }
 jib.to.image = 'itssarahkw/chemsafetyassistant:v0.0'
 
@@ -52,4 +53,17 @@ testing {
 application {
     // Define the main class for the application.
     mainClass = 'ChemSafetyAsst.App'
+}
+// for deployment to azure
+azurewebapp {
+    subscription = '141e6a7a-d265-4d26-b5a2-5c3af757da9d'
+    resourceGroup = 'chemsafetyassistant_group'
+    appName = 'chemSafetyAsstBackend'
+    pricingTier = 'B1'
+    region = 'centralus'
+    runtime {
+      os = 'Linux'
+      webContainer = 'Java SE' // or 'Java SE' if you want to run an executable jar
+      javaVersion = 'Java 17'
+    }
 }
