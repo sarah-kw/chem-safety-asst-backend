@@ -58,6 +58,9 @@ jar {
             'Main-Class': 'ChemSafetyAsst.App'
         )
     }
+    from {
+    configurations.implementation.collect { it.isDirectory() ? it : zipTree(it) }
+    }
 }
 
 application {
