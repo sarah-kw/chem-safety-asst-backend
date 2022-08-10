@@ -14,7 +14,7 @@ plugins {
     id 'com.microsoft.azure.azurewebapp' version '1.2.0'
 }
 jib.to.image = 'itssarahkw/chemsafetyassistant:v0.0'
-
+apply plugin: 'java'
 // application {
 //     targetCompatibility = "17"
 // }
@@ -38,6 +38,8 @@ dependencies {
     implementation 'com.google.guava:guava:31.0.1-jre'
     implementation "com.sparkjava:spark-core:2.9.4"
     implementation 'com.fasterxml.jackson.core:jackson-databind:2.8.9'
+    implementation 'org.apache.logging.log4j:log4j-api:2.18.0'
+    implementation 'org.apache.logging.log4j:log4j-core:2.18.0'
 }
 
 testing {
@@ -47,6 +49,14 @@ testing {
             // Use JUnit Jupiter test framework
             useJUnitJupiter('5.8.2')
         }
+    }
+}
+
+jar {
+    manifest {
+        attributes(
+            'Main-Class': 'ChemSafetyAsst.App'
+        )
     }
 }
 
