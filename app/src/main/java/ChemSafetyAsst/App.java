@@ -167,9 +167,9 @@ public class App {
     public static void main(String[] args) {
         // Does this make the app??? check later
         // System.out.println(new App().getGreeting());
-        
+        port(80);
         // Setup; need one of each of these 
-        enableCORS("http://localhost:3000", "GET", "*");
+        enableCORS("*", "GET", "*");
         HttpClient client = HttpClient.newBuilder().build();
         ObjectMapper objectMapper = new ObjectMapper();
 
