@@ -10,7 +10,9 @@ import java.net.URI;
 import java.net.http.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
+// import java.util.Arrays;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 
 public class App {
@@ -58,6 +60,20 @@ public class App {
         System.out.println(getPUGViewData.uri());
         return getPUGViewData;
     }
+
+    private static HttpRequest chemicalInfoFromMultipleCIDRequest(ArrayList<String> cids){
+        // https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/1,2,3,4,5/
+        // property/MolecularFormula,MolecularWeight,CanonicalSMILES,IUPACName,Title/JSON
+        String uriQuery = String.join(",",cids);
+        System.out.println(uriQuery);
+        HttpRequest getPUGRestData = HttpRequest.newBuilder()
+            .uri(
+                URI.create(pugRestUrl+"cid/"+uriQuery+"/property/MolecularFormula,MolecularWeight,CanonicalSMILES,IUPACName,Title/JSON")
+            ).build();
+        System.out.println(getPUGRestData.uri());
+        return getPUGRestData;
+    }
+
 
     private static ArrayList<String[]> createHazardList(JsonNode hazardData) {
         ArrayList<String[]> hazardReturn = new ArrayList<String[]>();
@@ -175,7 +191,9 @@ public class App {
         ObjectMapper objectMapper = new ObjectMapper();
 
         get("/chemicals", (req, res) -> {
-            ArrayList<Chemical> chemicals = new ArrayList<Chemical>();
+            HashMap<String,Chemical> chemicals = new HashMap<String, Chemical>();
+            ArrayList<String> cids = new ArrayList<String>();
+
             for(String param : req.queryParams()){
                 System.out.println(param);
 
@@ -203,7 +221,8 @@ public class App {
                         
                         newChemical.setCID(cid);
                         getHazardsByCID(newChemical, client, objectMapper);
-                        chemicals.add(newChemical);
+                        chemicals.put(newChemical.getCID(), newChemical);
+                        cids.add(cid);
                     } else {
                         // Try search by SMILES
                         HttpRequest cidRequestSMILES = cidFromSMILESRequest(newChemical.urlify());
@@ -224,15 +243,60 @@ public class App {
                                 .path("CID")
                                 .get(0)
                                 .toString();
-                            
-                            newChemical.setCID(cid);
-                            getHazardsByCID(newChemical, client, objectMapper);
-                            chemicals.add(newChemical);
-                        } else{
-                        chemicals.add(newChemical);}
+                            if(cid == "0"){
+                                String keyString = "noCID_" + value;
+                                chemicals.put(keyString, newChemical);
+                            } else {
+                                newChemical.setCID(cid);
+                                getHazardsByCID(newChemical, client, objectMapper);
+                                chemicals.put(newChemical.getCID(), newChemical);
+                                cids.add(cid);
+                            }
+                        } else {
+                            String keyString = "noCID_" + value;
+                            chemicals.put(keyString, newChemical);
+                        };
                     };
                 };
             };
+
+            // get chemical info for chemicals with CID
+            HttpRequest chemInfoRequest = chemicalInfoFromMultipleCIDRequest(cids);
+            System.out.println(chemInfoRequest);
+            HttpResponse<String> chemInfoResponse;
+            try {
+                chemInfoResponse = client.send(
+                    chemInfoRequest, HttpResponse.BodyHandlers.ofString()
+                    );
+            } catch (IOException e) {
+                System.out.println("IO exception occurred");
+                throw new IOException("error in cidRequest");
+            }
+
+            if (chemInfoResponse.statusCode() == 200){
+                System.out.println("successful request");
+                JsonNode rootNode = objectMapper.readTree(chemInfoResponse.body());
+                Iterator<JsonNode> chemInfoIterator = rootNode.path("PropertyTable")
+                    .get("Properties").elements();
+                while(chemInfoIterator.hasNext()){
+                    JsonNode chemInfoBlock = chemInfoIterator.next();
+                    System.out.println(chemInfoBlock);
+                    String activeCID = chemInfoBlock.get("CID").toString();
+                    System.out.println("CID is "+activeCID);
+                    Chemical activeChemical = chemicals.get(activeCID);
+                    System.out.println(activeChemical);
+                    activeChemical.setCommonName(chemInfoBlock.get("Title").asText());
+                    activeChemical.setCanonicalSMILES(chemInfoBlock.get("CanonicalSMILES").asText());
+                    activeChemical.setIupacName(chemInfoBlock.get("IUPACName").asText());
+                }
+            }
+
+
+
+            // Set<String> cids = chemicals.keySet();
+            // System.out.println("cids are "+cids);
+            // cids.removeIf(x -> (x.split("_")[0].equals("noCID")));
+            // System.out.println(cids);
 
             String chemicalJson = objectMapper.writeValueAsString(chemicals);
             return chemicalJson;
