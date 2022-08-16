@@ -199,9 +199,11 @@ public class App {
 
                 for (String value : req.queryParamsValues(param)){
                     Chemical newChemical = new Chemical(value);
-
                     // Try search by name
-                    HttpRequest cidRequest = cidFromNameRequest(newChemical.urlify());
+                    // %20 encode space by replacing + from urlify;
+                    // won't do this with SMILES b/c could expect + used
+                    // with meaning in that context
+                    HttpRequest cidRequest = cidFromNameRequest(newChemical.urlify().replace("+", "%20"));
                     System.out.println(cidRequest.uri());
                     HttpResponse<String> cidResponse;
                     try {
