@@ -120,6 +120,12 @@ public class App {
 
         JsonNode hazardRoot = objectMapper.readTree(hazardResponse.body());
 
+        // Handle case where CID record exists but no formal GHS hazards header
+        JsonNode faultNode = hazardRoot.path("Fault");
+        if (!faultNode.isMissingNode()){
+            return;
+        }
+
         JsonNode hazardCheckpoint = hazardRoot
             .path("Record")
             .path("Section")
@@ -129,6 +135,7 @@ public class App {
             .path("Section")
             .get(0)
             .path("Information");
+        // ismissing?
                         
         System.out.println("the size is "+ hazardCheckpoint.size());
         if (hazardCheckpoint.size() > 1){
