@@ -12,6 +12,7 @@ public class Chemical {
     // cid obtained from PUGrest
     private String cid;
 
+    // PubChem info fields
     private String canonicalSMILES;
     private String iupacName;
     private String commonName;
@@ -33,7 +34,6 @@ public class Chemical {
     public String getCommonName(){
         return this.commonName;
     }
-
 
 
     // hazard codes+descriptors from PUGView
@@ -85,7 +85,7 @@ public class Chemical {
     }
 
 
-
+    // encoding and viewing
     public String printIdentifier(){
         System.out.println("the identifier is "+cid);
         return "The identifier is " + this.cid;

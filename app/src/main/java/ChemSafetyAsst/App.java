@@ -4,28 +4,25 @@
 
 package ChemSafetyAsst;
 import static spark.Spark.*;
-// import ChemSafetyAsst.Chemical;
 import java.io.*;
 import java.net.URI;
 import java.net.http.*;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
-// import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 
 public class App {
+
+    //constants for API calls
     private static String pugViewUrl = "https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound/";
-    // <cid>/JSON?heading=GHS%20Classification
     private static String pugRestUrl = "https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/";
 
-    public String getGreeting() {
-        return "Hello World! Test";
-    }
-
-// Enables CORS on requests. This method is an initialization method and should be called once.
-// From SparkJava tutorial https://sparkjava.com/tutorials/cors
+    /** Enables CORS on requests. This method is an initialization method and 
+     * should be called once.
+     * From SparkJava tutorial https://sparkjava.com/tutorials/cors 
+     */
     private static void enableCORS(final String origin, final String methods, final String headers) {
 
         options("/*", (request, response) -> {
@@ -52,6 +49,11 @@ public class App {
         });
     }
 
+    /**
+     * Create an HTTPRequest to get hazards from a single CID using an API
+     * call to PUGView.
+     * @param cid   the CID to search
+     */
     private static HttpRequest hazardsFromCIDrequest(String cid) {
         HttpRequest getPUGViewData = HttpRequest.newBuilder()
             .uri(
@@ -61,9 +63,12 @@ public class App {
         return getPUGViewData;
     }
 
+    /**
+     * Create an HTTPRequest to get chemical info for multiple CIDs in one API
+     * call to PUGRest. 
+     * @param cids  the CIDs to search
+     */
     private static HttpRequest chemicalInfoFromMultipleCIDRequest(ArrayList<String> cids){
-        // https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/1,2,3,4,5/
-        // property/MolecularFormula,MolecularWeight,CanonicalSMILES,IUPACName,Title/JSON
         String uriQuery = String.join(",",cids);
         System.out.println(uriQuery);
         HttpRequest getPUGRestData = HttpRequest.newBuilder()
@@ -74,7 +79,10 @@ public class App {
         return getPUGRestData;
     }
 
-
+    /**
+     * Parse hazard information into nested list format from JSON Node returned
+     * by API call to PUGView
+     */
     private static ArrayList<String[]> createHazardList(JsonNode hazardData) {
         ArrayList<String[]> hazardReturn = new ArrayList<String[]>();
         Iterator<JsonNode> hazards = hazardData.elements();
@@ -87,6 +95,11 @@ public class App {
         return hazardReturn;
     }
 
+    /**
+     * 
+     * @param smiles    a SMILES string molecular representation
+     * @return  an HTTPRequest to get CID from SMILES from PubChem
+     */
     private static HttpRequest cidFromSMILESRequest(String smiles){
         HttpRequest getPUGRestCID = HttpRequest.newBuilder()
         .uri(
@@ -95,6 +108,11 @@ public class App {
         return getPUGRestCID;
     }
     
+    /**
+     * 
+     * @param name  a string to use to search for a chemical
+     * @return an HTTPRequest to get CID from a name from PubChem
+     */
     private static HttpRequest cidFromNameRequest(String name){
         HttpRequest getPUGRestCID = HttpRequest.newBuilder()
         .uri(
@@ -103,6 +121,14 @@ public class App {
         return getPUGRestCID;
     }
 
+    /**
+     * 
+     * @param chemical  The Chemical object for which to get hazards
+     * @param client    the app's active HttpClient object
+     * @param objectMapper  the app's active ObjectMapper object
+     * @throws IOException
+     * @throws InterruptedException
+     */
     private static void getHazardsByCID(Chemical chemical, HttpClient client, ObjectMapper objectMapper) throws IOException, InterruptedException{
         HttpRequest hazardRequest = hazardsFromCIDrequest(chemical.getCID());
         HttpResponse<String> hazardResponse;
@@ -135,9 +161,10 @@ public class App {
             .path("Section")
             .get(0)
             .path("Information");
-        // ismissing?
-                        
+
+        // for debugging             
         System.out.println("the size is "+ hazardCheckpoint.size());
+
         if (hazardCheckpoint.size() > 1){
             JsonNode hazardCodes = hazardRoot
                 .path("Record")
@@ -152,8 +179,10 @@ public class App {
                 .path("Value")
                 .path("StringWithMarkup");
             ArrayList<String[]> hazardList = createHazardList(hazardCodes);
-                            // System.out.println(toPrint.get(0)[1]);
+
+            //for debugging
             System.out.println(hazardList);
+
             chemical.setHazards(hazardList);
 
             JsonNode precautionCodes = hazardRoot
@@ -170,14 +199,16 @@ public class App {
                 .path("StringWithMarkup")
                 .get(0);
 
-                            // String[] precInfo = precautionCodes
-                            //     .path("String").textValue().split(", ");
             String[] precInfo = precautionCodes
                 .path("String").textValue().split(", and |, |and ");
+            
+            // for debugging
             System.out.println(precautionCodes);
             System.out.println(precInfo);
+
             chemical.setPrecautions(precInfo);
         } else {
+            // if no CID, set hazard info to empty arrays
             ArrayList<String[]> hazardList = new ArrayList<String[]>();
             chemical.setHazards(hazardList);
             String[] precautionList = new String[0];
@@ -188,30 +219,39 @@ public class App {
 
     //main app starts here
     public static void main(String[] args) {
-        // Does this make the app??? check later
-        // System.out.println(new App().getGreeting());
         // port for deployment
         port(80);
+
         // Setup; need one of each of these 
         enableCORS("*", "GET", "*");
         HttpClient client = HttpClient.newBuilder().build();
         ObjectMapper objectMapper = new ObjectMapper();
 
+        /**
+         * Core app route -- returns JSON object with chemical information
+         */
         get("/chemicals", (req, res) -> {
+
+            // Holds the Chemical objects
             HashMap<String,Chemical> chemicals = new HashMap<String, Chemical>();
+            // Holds valid PubChem CIDs from lookups
             ArrayList<String> cids = new ArrayList<String>();
 
             for(String param : req.queryParams()){
+                // for debugging
                 System.out.println(param);
 
                 for (String value : req.queryParamsValues(param)){
                     Chemical newChemical = new Chemical(value);
+
                     // Try search by name
                     // %20 encode space by replacing + from urlify;
                     // won't do this with SMILES b/c could expect + used
                     // with meaning in that context
                     HttpRequest cidRequest = cidFromNameRequest(newChemical.urlify().replace("+", "%20"));
+                    // for debugging
                     System.out.println(cidRequest.uri());
+
                     HttpResponse<String> cidResponse;
                     try {
                         cidResponse = client.send(
@@ -271,6 +311,7 @@ public class App {
 
             // get chemical info for chemicals with CID
             HttpRequest chemInfoRequest = chemicalInfoFromMultipleCIDRequest(cids);
+            // for debugging
             System.out.println(chemInfoRequest);
             HttpResponse<String> chemInfoResponse;
             try {
@@ -283,58 +324,48 @@ public class App {
             }
 
             if (chemInfoResponse.statusCode() == 200){
+                // for debugging
                 System.out.println("successful request");
                 JsonNode rootNode = objectMapper.readTree(chemInfoResponse.body());
                 Iterator<JsonNode> chemInfoIterator = rootNode.path("PropertyTable")
                     .get("Properties").elements();
+
+                // iterate over object returned by PUGREST multi-CID property lookup    
                 while(chemInfoIterator.hasNext()){
                     JsonNode chemInfoBlock = chemInfoIterator.next();
+                    // for debugging
                     System.out.println(chemInfoBlock);
+
                     String activeCID = chemInfoBlock.get("CID").toString();
+
+                    //for debugging
                     System.out.println("CID is "+activeCID);
+
                     Chemical activeChemical = chemicals.get(activeCID);
-                    System.out.println(activeChemical);
                     activeChemical.setCommonName(chemInfoBlock.get("Title").asText());
                     activeChemical.setCanonicalSMILES(chemInfoBlock.get("CanonicalSMILES").asText());
                     activeChemical.setIupacName(chemInfoBlock.get("IUPACName").asText());
                 }
             }
 
-
-
-            // Set<String> cids = chemicals.keySet();
-            // System.out.println("cids are "+cids);
-            // cids.removeIf(x -> (x.split("_")[0].equals("noCID")));
-            // System.out.println(cids);
-
             String chemicalJson = objectMapper.writeValueAsString(chemicals);
             return chemicalJson;
         });
         
-        get("/testrequest", (req, res) -> {
-            HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create("https://pubchem.ncbi.nlm.nih.gov/rest/pug/substance/sid/53789435/synonyms/json"))
-            .build();
-            HttpResponse<String> response;
-            try {
-                response = client.send(
-                    request, HttpResponse.BodyHandlers.ofString()
-                    );
-            } catch (IOException e) {
-                System.out.println("IO exception occurred");
-                return "error";
-            }
-            return response.body();
-        });
-
+        /**
+         * "Hello, I am alive" route
+         */
         get("/hello", (req, res) -> 
         {
             return "{\"Hello World\"}";
         });
 
-        get("/stop", (req, res) -> {
-            stop();
-            return "stopping";
-        });
+        /**
+         * For halting a local server from the browser
+         */
+        // get("/stop", (req, res) -> {
+        //     stop();
+        //     return "stopping";
+        // });
     }
 }
